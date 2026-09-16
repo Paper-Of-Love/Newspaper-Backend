@@ -110,3 +110,4 @@ require the session cookie from `/api/auth/login`.
   up to this server yet — it still reads from its own local `posts/*.json`
   files. Pointing it at `GET /api/posts` instead is a follow-up step.
 # Newspaper-Backend
+# Newspaper-Backend
