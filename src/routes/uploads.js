@@ -1,10 +1,12 @@
 const path = require("path");
+const fs = require("fs");
 const crypto = require("crypto");
 const express = require("express");
 const multer = require("multer");
 const { requireAnyRole } = require("../auth");
 
 const UPLOAD_DIR = path.join(__dirname, "..", "..", "data", "uploads");
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
   destination: UPLOAD_DIR,
