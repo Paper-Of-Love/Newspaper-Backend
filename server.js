@@ -10,8 +10,9 @@ const { attachSession } = require("./src/auth");
 const authRoutes = require("./src/routes/auth");
 const postRoutes = require("./src/routes/posts");
 const { router: uploadRoutes, UPLOAD_DIR } = require("./src/routes/uploads");
+const backupRoutes = require("./src/routes/backup");
 
-for (const key of ["WRITER_PASSWORD", "EDITOR_PASSWORD", "JWT_SECRET"]) {
+for (const key of ["WRITER_PASSWORD", "EDITOR_PASSWORD", "JWT_SECRET", "BACKUP_TOKEN"]) {
   if (!process.env[key]) {
     console.error(`Missing required environment variable: ${key}`);
     console.error("Copy .env.example to .env and fill in real values.");
@@ -42,6 +43,7 @@ app.use("/uploads", express.static(UPLOAD_DIR));
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/uploads", uploadRoutes);
+app.use("/api/admin/backup", backupRoutes);
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 

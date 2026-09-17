@@ -1,0 +1,42 @@
+name: Backup database
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # daily at 08:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch backup archive from the live server
+        run: |
+          curl -sS -f \
+            -H "x-backup-token: ${{ secrets.BACKUP_TOKEN }}" \
+            "${{ secrets.BACKUP_URL }}" \
+            -o backup.tar.gz
+
+      - name: Commit archive to the backups branch
+        run: |
+          git clone --branch backups --single-branch \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" \
+            backups-repo
+
+          mkdir -p backups-repo/backups
+          cp backup.tar.gz "backups-repo/backups/$(date -u +%Y-%m-%d).tar.gz"
+
+          # keep the most recent 60 days of backups
+          cd backups-repo/backups
+          ls -1 | sort | head -n -60 | xargs -r rm --
+          cd ../..
+
+          cd backups-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add backups
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "Backup $(date -u +%Y-%m-%d)"
+          git push
