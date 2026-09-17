@@ -3,6 +3,10 @@ const jwt = require("jsonwebtoken");
 
 const COOKIE_NAME = "session";
 const TOKEN_TTL = "7d";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const COOKIE_OPTIONS = IS_PRODUCTION
+  ? { sameSite: "none", secure: true }
+  : { sameSite: "lax", secure: false };
 
 function timingSafeEqual(a, b) {
   const bufA = Buffer.from(String(a));
@@ -26,13 +30,13 @@ function setSessionCookie(res, payload) {
   const token = issueToken(payload);
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: "lax",
+    ...COOKIE_OPTIONS,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 }
 
 function clearSessionCookie(res) {
-  res.clearCookie(COOKIE_NAME);
+  res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
 }
 
 function readSession(req) {
