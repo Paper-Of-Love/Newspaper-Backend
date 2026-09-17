@@ -34,17 +34,16 @@ function getPostOr404(req, res) {
   return post;
 }
 
-function canView(post, session) {
+function canView(post, req) {
   if (post.status === "published") return true;
-  if (session && session.role === "editor") return true;
-  if (session && session.role === "writer" && session.username === post.author) return true;
+  if (req.editorSession) return true;
+  if (req.writerSession && req.writerSession.username === post.author) return true;
   return false;
 }
 
 // GET /api/posts — public list (published only), or full list for an editor.
 router.get("/", (req, res) => {
-  const session = req.session;
-  if (session && session.role === "editor") {
+  if (req.editorSession) {
     const { status } = req.query;
     const rows = status
       ? db.prepare("SELECT * FROM posts WHERE status = ? ORDER BY updated_at DESC").all(status)
@@ -69,7 +68,7 @@ router.get("/mine", requireRole("writer"), (req, res) => {
 router.get("/:id", (req, res) => {
   const post = getPostOr404(req, res);
   if (!post) return;
-  if (!canView(post, req.session)) {
+  if (!canView(post, req)) {
     return res.status(404).json({ error: "post not found" });
   }
   res.json(serializePost(post));
@@ -108,12 +107,10 @@ router.put("/:id", (req, res) => {
   const post = getPostOr404(req, res);
   if (!post) return;
 
-  const session = req.session;
-  const isEditor = session && session.role === "editor";
+  const isEditor = !!req.editorSession;
   const isOwnerBeforePublish =
-    session &&
-    session.role === "writer" &&
-    session.username === post.author &&
+    req.writerSession &&
+    req.writerSession.username === post.author &&
     post.status !== "published";
 
   if (!isEditor && !isOwnerBeforePublish) {

@@ -1,5 +1,5 @@
 const express = require("express");
-const { checkPassword, setSessionCookie, clearSessionCookie } = require("../auth");
+const { checkPassword, issueToken } = require("../auth");
 
 const router = express.Router();
 
@@ -19,18 +19,22 @@ router.post("/login", (req, res) => {
   const payload = { role };
   if (role === "writer") payload.username = username.trim();
 
-  setSessionCookie(res, payload);
-  res.json({ ok: true, role: payload.role, username: payload.username || null });
+  const token = issueToken(payload);
+  res.json({ ok: true, token, role: payload.role, username: payload.username || null });
 });
 
 router.post("/logout", (req, res) => {
-  clearSessionCookie(res);
+  // Stateless JWTs aren't server-invalidated; the client just discards its
+  // stored token. Kept as a route for symmetry / future blacklisting.
   res.json({ ok: true });
 });
 
 router.get("/me", (req, res) => {
-  if (!req.session) return res.status(401).json({ error: "not signed in" });
-  res.json({ role: req.session.role, username: req.session.username || null });
+  const { role } = req.query;
+  const session =
+    role === "writer" ? req.writerSession : role === "editor" ? req.editorSession : req.writerSession || req.editorSession;
+  if (!session) return res.status(401).json({ error: "not signed in" });
+  res.json({ role: session.role, username: session.username || null });
 });
 
 module.exports = router;

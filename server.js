@@ -3,7 +3,6 @@ require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
-const cookieParser = require("cookie-parser");
 const cors = require("cors");
 
 const { attachSession } = require("./src/auth");
@@ -31,11 +30,9 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || "")
 app.use(
   cors({
     origin: allowedOrigins.length ? allowedOrigins : true,
-    credentials: true,
   })
 );
 app.use(express.json());
-app.use(cookieParser());
 app.use(attachSession);
 
 app.use("/uploads", express.static(UPLOAD_DIR));

@@ -1,12 +1,7 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 
-const COOKIE_NAME = "session";
 const TOKEN_TTL = "7d";
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const COOKIE_OPTIONS = IS_PRODUCTION
-  ? { sameSite: "none", secure: true }
-  : { sameSite: "lax", secure: false };
 
 function timingSafeEqual(a, b) {
   const bufA = Buffer.from(String(a));
@@ -26,22 +21,7 @@ function issueToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: TOKEN_TTL });
 }
 
-function setSessionCookie(res, payload) {
-  const token = issueToken(payload);
-  res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    ...COOKIE_OPTIONS,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
-}
-
-function clearSessionCookie(res) {
-  res.clearCookie(COOKIE_NAME, COOKIE_OPTIONS);
-}
-
-function readSession(req) {
-  const token = req.cookies && req.cookies[COOKIE_NAME];
-  if (!token) return null;
+function verifyToken(token) {
   try {
     return jwt.verify(token, process.env.JWT_SECRET);
   } catch (e) {
@@ -49,31 +29,45 @@ function readSession(req) {
   }
 }
 
+// Sessions travel as a bearer token in the Authorization header, stored
+// client-side in localStorage, rather than a cookie. Cookies set by a
+// cross-origin API (frontend on GitHub Pages, backend on Fly.io) are
+// "third-party" from the browser's point of view, and Safari/Brave on iOS
+// block or expire those regardless of SameSite/Secure flags — a bearer
+// token sidesteps that entirely.
 function attachSession(req, res, next) {
-  req.session = readSession(req);
+  const header = req.get("authorization") || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  const payload = token ? verifyToken(token) : null;
+
+  req.writerSession = payload && payload.role === "writer" ? payload : null;
+  req.editorSession = payload && payload.role === "editor" ? payload : null;
   next();
 }
 
 function requireRole(role) {
   return (req, res, next) => {
-    if (!req.session || req.session.role !== role) {
+    const session = role === "writer" ? req.writerSession : req.editorSession;
+    if (!session) {
       return res.status(401).json({ error: `${role} authentication required` });
     }
+    req.session = session;
     next();
   };
 }
 
 function requireAnyRole(req, res, next) {
-  if (!req.session) {
+  const session = req.writerSession || req.editorSession;
+  if (!session) {
     return res.status(401).json({ error: "authentication required" });
   }
+  req.session = session;
   next();
 }
 
 module.exports = {
   checkPassword,
-  setSessionCookie,
-  clearSessionCookie,
+  issueToken,
   attachSession,
   requireRole,
   requireAnyRole,
